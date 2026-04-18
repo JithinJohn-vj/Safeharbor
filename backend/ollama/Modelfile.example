@@ -1,0 +1,15 @@
+# Optional: create a named custom model in Ollama (persona baked into the tag).
+# 1. Install Ollama: https://ollama.com
+# 2. ollama pull llama3.2
+# 3. Copy this file to Modelfile, edit SYSTEM, then:
+#    ollama create safeharbor -f Modelfile
+# 4. In backend/.env set: LLM_PROVIDER=ollama  OLLAMA_MODEL=safeharbor
+#
+# Note: SafeHarbor still sends a full system prompt from the app each request;
+# this SYSTEM is extra / default character for the Ollama model tag.
+
+FROM llama3.2
+
+SYSTEM """You are a helpful, compassionate assistant."""
+
+PARAMETER temperature 0.7
