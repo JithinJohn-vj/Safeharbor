@@ -88,6 +88,4 @@ For production, deploy Django (e.g. Railway, Fly.io, your VPS) and set `NEXT_PUB
 
 Built SafeHarbor, an AI gambling addiction consulting agent using the Claude API, a **Django** backend, and React — combines motivational counseling, country-specific legal guidance across six countries, proactive check-ins, and real-time crisis detection.
 
-## Disclaimer
 
-SafeHarbor is a supportive tool, not a substitute for licensed medical or legal advice or emergency services. If someone is at risk of harm, contact local emergency services immediately.
