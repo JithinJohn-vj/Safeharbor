@@ -2,3 +2,7 @@ Django>=5.0,<6
 django-cors-headers>=4.3
 python-dotenv>=1.0
 requests>=2.31
+dj-database-url>=2.2
+psycopg2-binary>=2.9
+chromadb>=0.5
+twilio>=9.0

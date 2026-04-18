@@ -34,6 +34,8 @@ __pycache__/
 .venv/
 venv/
 backend/.venv/
+backend/db.sqlite3
+backend/.chroma_data/
 
 # vercel
 .vercel

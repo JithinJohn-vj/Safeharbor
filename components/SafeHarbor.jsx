@@ -82,6 +82,8 @@ function detectCrisis(text) {
 const PROBE_USER =
   "(You've been quiet for about a minute. As SafeHarbor, send one brief warm check-in — gentle presence only, no assumptions. One short paragraph.)";
 
+const SESSION_STORAGE_KEY = "safeharbor_session_id";
+
 /** Local dev: default so chat works if .env was not copied or Next was not restarted after adding NEXT_PUBLIC_DJANGO_API_URL */
 function getDjangoApiBase() {
   const fromEnv = (process.env.NEXT_PUBLIC_DJANGO_API_URL || "").trim().replace(/\/$/, "");
@@ -199,10 +201,12 @@ export default function SafeHarbor() {
   const [loading, setLoading] = useState(false);
   const [proactivePending, setProactivePending] = useState(false);
   const [crisisMode, setCrisisMode] = useState(false);
+  const [sessionId, setSessionId] = useState("");
 
   const messagesScrollRef = useRef(null);
   const nudgeTimerRef = useRef(null);
   const inputRef = useRef(null);
+  const sessionIdRef = useRef("");
   const messagesRef = useRef(messages);
   const loadingRef = useRef(loading);
   const nameRef = useRef(name);
@@ -220,6 +224,46 @@ export default function SafeHarbor() {
   useEffect(() => {
     countryRef.current = country;
   }, [country]);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  /** Restore prior session from Django (persistent memory across visits). */
+  useEffect(() => {
+    const base = getDjangoApiBase();
+    if (!base || typeof window === "undefined") return;
+    const sid = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!sid) return;
+    let cancelled = false;
+    fetch(`${base}/api/session/${sid}/`)
+      .then((r) => {
+        if (r.status === 404 && typeof window !== "undefined") {
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+        return r.ok ? r.json() : null;
+      })
+      .then((data) => {
+        if (cancelled || !data?.messages?.length) return;
+        sessionIdRef.current = sid;
+        setSessionId(sid);
+        if (data.display_name) setName(data.display_name);
+        if (data.country_code) {
+          const c = COUNTRIES.find((x) => x.code === data.country_code);
+          if (c) setCountry(c);
+        }
+        setMessages(
+          data.messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }))
+        );
+        setPhase("chat");
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** Keep the latest messages in view: scroll the chat pane (not the whole page). */
   const scrollChatToBottom = useCallback(() => {
@@ -250,6 +294,9 @@ export default function SafeHarbor() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        session_id: sessionIdRef.current || undefined,
+        display_name: nameRef.current,
+        country_code: countryRef.current.code,
         system: buildSystemPrompt(nameRef.current, countryRef.current),
         messages: msgs.map((m) => ({ role: m.role, content: m.content })),
       }),
@@ -257,6 +304,13 @@ export default function SafeHarbor() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data.error || res.statusText);
+    }
+    if (data.session_id) {
+      sessionIdRef.current = data.session_id;
+      setSessionId(data.session_id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(SESSION_STORAGE_KEY, data.session_id);
+      }
     }
     return data.text || "I'm here for you. Tell me more.";
   }, []);
@@ -345,6 +399,18 @@ export default function SafeHarbor() {
 
   const startSession = async () => {
     if (!name.trim()) return;
+    if (typeof window !== "undefined" && !sessionIdRef.current) {
+      const existing = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (existing) {
+        sessionIdRef.current = existing;
+        setSessionId(existing);
+      } else {
+        const sid = crypto.randomUUID();
+        sessionIdRef.current = sid;
+        setSessionId(sid);
+        localStorage.setItem(SESSION_STORAGE_KEY, sid);
+      }
+    }
     setPhase("chat");
     setLoading(true);
     const opening = [
